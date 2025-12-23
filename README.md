@@ -31,19 +31,16 @@ The architecture consists of four modular stages integrated into a unified predi
 3. **TME:** Encodes the sequence of non-wear events using a multi-head attention mechanism.
 4. **Decoder:** Ranks the data into SII categories (None, Mild, Moderate, Severe) using ordinal decoding.
 
-![ComplianceNet Architecture](https://github.com/<<yourusername>>/ComplianceNet/assets/images/architecture_diagram.png)
 
 ## Output
 
 #### Output 1 - Pipeline Demonstration
 The `demo.py` script illustrates the end-to-end flow from raw data generation to phenotype classification and severity prediction.
 
-![Demo Output](https://github.com/<<yourusername>>/ComplianceNet/assets/images/demo_run.png)
 
 #### Output 2 - Comprehensive Test Execution
 Verification of system robustness via the 133-test suite, ensuring 100% logic and performance validation.
 
-![Test Results](https://github.com/<<yourusername>>/ComplianceNet/assets/images/test_results.png)
 
 **Model Verification Rate:** 100% (133/133 tests passed)  
 **Phenotype Classification Confidence:** 95%+ in simulated benchmarks.
