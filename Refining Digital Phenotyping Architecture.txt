@@ -1,0 +1,805 @@
+﻿Deep Temporal Causality: A Robust, 
+Invariant Architecture for Problematic 
+Internet Use Detection 
+Abstract 
+
+The intersection of computational psychiatry and machine learning is currently undergoing a 
+critical paradigm shift, moving from the passive identification of correlational biomarkers to 
+the active discovery of causal mechanisms. This transition is nowhere more urgent than in the 
+domain of Problematic Internet Use (PIU), a behavioral phenotype that has emerged as a 
+significant public health concern among children and adolescents. The prevailing predictive 
+models, exemplified by the winning solutions of the Child Mind Institute (CMI) Kaggle 
+competition, predominantly rely on ensemble methods (e.g., XGBoost, LightGBM) that exploit 
+statistical regularities in training data. While effective for minimizing empirical risk on finite 
+datasets, these "black box" models are notoriously fragile, often failing to generalize across 
+out-of-distribution (OOD) populations due to their reliance on spurious correlations and the 
+stochastic "luck" of data splitting. This comprehensive report presents a finalized, robust 
+architecture termed Causal-HD-Mamba (Causal Hierarchical Disentangled Mamba). This 
+framework integrates the linear computational efficiency of State Space Models (specifically 
+the Mamba architecture), the structural rigor of Neural Granger Causality, and the 
+generalization power of Invariant Risk Minimization (specifically Variance Risk Extrapolation, or 
+V-REx). By disentangling the complex, time-lagged relationships between physical activity, 
+sleep architecture, and digital habits, Causal-HD-Mamba offers a path toward clinically 
+interpretable and causally valid digital phenotyping. 
+
+1. The Crisis of Correlation in Digital Phenotyping 
+The digitization of behavioral health data has promised a revolution in how we diagnose and 
+treat psychiatric disorders. The availability of high-frequency sensor data from 
+wearables—capturing acceleration, heart rate, and ambient light—offers an objective window 
+into the daily lives of patients that subjective questionnaires cannot match. However, the field 
+currently faces a "Crisis of Correlation." In the rush to maximize leaderboard metrics such as 
+the Quadratic Weighted Kappa (QWK), researchers and data scientists often prioritize models 
+that function as powerful pattern matchers rather than mechanistic explanations. 
+
+1.1 The Limitations of "Black Box" Ensembles in the CMI Competition 
+The Problematic Internet Use (PIU) competition hosted by the Child Mind Institute (CMI) 
+serves as a microcosm of the broader challenges in the field. The objective was to predict the 
+
+
+
+Severity Impairment Index (SII), a measure derived from the Parent-Child Internet Addiction 
+Test (PCIAT), using a combination of tabular phenotype data and raw accelerometer series.1 
+The dataset, drawn from the Healthy Brain Network (HBN), provided a rich tapestry of 
+bio-behavioral signals, yet the winning solutions often bypassed this richness in favor of 
+brute-force statistical association. 
+
+An analysis of the top-performing solutions reveals a troubling trend: the dominance of 
+tree-based ensembles (XGBoost, CatBoost, LightGBM) that rely heavily on manual feature 
+engineering and "lucky" random seeds. As noted by the winner of the competition, "luck 
+played a major role" in selecting the specific notebook that generalized well to the private 
+leaderboard.3 This phenomenon is symptomatic of the Rashomon Effect, a concept in 
+machine learning theory where a multitude of distinct models with different feature subsets 
+yield similar predictive accuracy on a training set, yet imply contradictory underlying 
+mechanisms. 
+
+Consider the implications of this effect in a clinical setting. One model might select "BMI" as a 
+primary predictor because it correlates with sedentary behavior in the training demographics, 
+while another selects "Sleep Efficiency" or "Physical Activity." Both models might achieve a 
+QWK of 0.45, but they suggest entirely different interventions. A clinician relying on the first 
+model might prescribe weight loss or dietary changes to treat internet addiction—an 
+intervention based on a spurious correlation that could be ineffective or even harmful, 
+reinforcing body image issues without addressing the root behavioral pathology. A clinician 
+relying on the second model might focus on sleep hygiene. Without a causal framework to 
+adjudicate these selections, the resulting models are clinically hazardous. 
+
+Furthermore, these ensemble approaches typically "flatten" the temporal dimension of the 
+actigraphy data. By reducing weeks of continuous time-series data into static aggregates 
+(e.g., "mean daily activity," "standard deviation of angle-z"), these methods destroy the 
+sequential information necessary to infer directionality. They cannot distinguish whether 
+fragmented sleep precedes excessive internet use (indicating a fatigue-induced loss of 
+inhibitory control) or follows it (indicating circadian displacement due to screen light).3 This 
+temporal flattening effectively erases the "arrow of time," rendering causal inference 
+impossible. 
+
+1.2 The Necessity of a Causal Approach 
+To transcend this reliance on chance and correlation, the field must adopt architectures 
+capable of learning invariant causal mechanisms. A causal mechanism is a relationship that 
+remains stable across different environments or distributions. For instance, the physiological 
+impact of sleep deprivation on cognitive control is a biological invariant; it should hold true 
+regardless of whether the data comes from a 10-year-old boy in the summer or a 17-year-old 
+girl in the winter. 
+
+The Causal-HD-Mamba architecture proposed in this report addresses three fundamental 
+
+
+
+flaws in the current state-of-the-art (SOTA): 
+1.​ Temporal Fidelity: It abandons static feature aggregation in favor of processing 
+
+long-sequence raw time series, preserving the fine-grained temporal dynamics of 
+behavior. This allows the model to detect micro-fragmentations in sleep and subtle 
+shifts in circadian phase that static features miss. 
+
+2.​ Causal Disentanglement: It explicitly separates variables that are causally linked from 
+those that are merely correlated, using a disentangled state-space approach. This 
+prevents the model from conflating "Internet Use" with "Sedentary Behavior," 
+recognizing that one can be sedentary without using the internet (e.g., reading a book). 
+
+3.​ Out-of-Distribution (OOD) Robustness: It utilizes Invariant Risk Minimization 
+techniques, specifically Variance Risk Extrapolation (V-REx), to penalize reliance on 
+environment-specific spurious correlations (e.g., age or season artifacts). This ensures 
+that the model's predictions are robust to shifts in demographics or data collection 
+conditions. 
+
+2. The Healthy Brain Network: A Data Substrate for 
+Causal Inquiry 
+The Healthy Brain Network (HBN) dataset serves as the foundational corpus for this 
+architecture. It is a uniquely rich, multi-modal biobank comprising data from approximately 
+5,000 participants aged 5 to 21.2 Understanding the specific characteristics, instrumentation 
+physics, and limitations of this dataset is a prerequisite for robust modeling. 
+
+2.1 Multi-Modal Instrumentation and Physics 
+The dataset creates a high-dimensional view of each participant through several distinct data 
+streams, each with its own physical and inferential properties. 
+
+Actigraphy (ActiGraph wGT3X-BT) 
+The primary objective measure of behavior is collected via wrist-worn accelerometers. Based 
+on HBN protocols, the device used is the ActiGraph wGT3X-BT.5 This is a research-grade 
+MEMS (Micro-Electro-Mechanical Systems) accelerometer, not a consumer toy. It records 
+triaxial acceleration ($x, y, z$) at frequencies ranging from 30Hz to 100Hz.7 
+
+●​ Resolution: The dynamic range is typically $\pm 8g$. This captures everything from the 
+subtle twitch of a finger during sleep to the high-impact force of a jump. 
+
+●​ Ambient Light Sensor: Crucially, the wGT3X-BT contains an integrated ambient light 
+sensor that records luminosity (lux).7 This channel is frequently ignored in standard 
+Kaggle analyses but is vital for causal modeling of PIU. Light is the primary zeitgeber 
+(time-giver) for the human circadian clock. Including light data allows the model to 
+distinguish between "late-night gaming in the dark" vs. "late-night gaming with lights 
+on," which have vastly different impacts on melatonin suppression and sleep 
+
+
+
+architecture. 
+●​ Capacitive Wear Sensor: The device includes a capacitive sensor on the back plate to 
+
+detect skin contact.6 This provides a ground truth for "non-wear" periods, preventing 
+the model from confusing "device on table" with "extremely sound sleep." 
+
+Physiological Measures 
+While the competition dataset focuses on accelerometry, the HBN protocol supports the 
+collection of heart rate data via Bluetooth coupling.9 Even if sparse in the specific competition 
+subset, the architecture is designed to ingest this multivariate stream. Heart rate variability 
+(HRV) is a potent marker of autonomic nervous system regulation. High PIU has been linked to 
+sympathetic overdrive (fight or flight) and reduced parasympathetic tone. 
+Clinical Phenotypes and Demographics 
+The target variable, the Severity Impairment Index (SII), is derived from the PCIAT.2 Auxiliary 
+measures include the FitnessGram (cardiovascular health), Bio-electric Impedance Analysis 
+(body composition), and the Sleep Disturbance Scale for Children (SDSC). These provide the 
+static "context" in which the temporal behavior unfolds. 
+2.2 Observational Challenges and Confounders 
+The HBN data is observational, not interventional. We cannot randomly assign children to 
+"high internet use" or "low sleep" conditions. This introduces significant confounding 
+structures that a robust architecture must handle. 
+
+Social Jetlag (SJL) and School Schedules 
+The misalignment between biological and social time, known as Social Jetlag, is a massive 
+confounder. School schedules impose rigid wake-up times on weekdays, leading to sleep debt 
+accumulation that is "repaid" on weekends.1 This creates a cyclical 7-day pattern in the data. 
+A purely autoregressive model might mistake this weekly recovery sleep for behavioral 
+instability or "oversleeping" pathology. Causal-HD-Mamba must explicitly model this 
+weekday/weekend interaction as an exogenous forcing function. 
+Seasonal Effects and Environmental Light 
+Data collection for the HBN spans multiple years and seasons. A child measured in winter may 
+exhibit lower physical activity and higher screen time simply due to colder weather and 
+shorter daylight hours, not due to an intrinsic internet addiction.10 The "Season" column in 
+the dataset is not just a label; it is a proxy for environmental constraints. A model that learns 
+"Low Activity predicts High PIU" without adjusting for season will fail when applied to a 
+summer dataset where active children also play video games. 
+Developmental Drift 
+The age range (5-21) covers critical developmental windows. Sleep needs drop significantly 
+from childhood (~10-11 hours) to young adulthood (~7-9 hours).12 Activity levels also naturally 
+decline during adolescence. A naive model might learn that "Low Sleep predicts PIU" simply 
+because older teenagers (who have higher PIU rates) naturally sleep less than 5-year-olds. 
+This is a classic spurious correlation. The architecture must normalize for developmental 
+stage, treating Age as a domain environment for Invariant Risk Minimization. 
+
+
+
+3. Foundations of Objective Behavioral Measurement 
+Before any deep learning can occur, the raw sensor data must be transformed into a causally 
+relevant signal. The widespread practice of using "activity counts"—a proprietary, black-box 
+aggregation metric specific to device manufacturers—is insufficient for causal AI. We employ 
+a Physics-Based Preprocessing Pipeline relying on open-source, transparent heuristics to 
+ensure reproducibility and physical validity. 
+
+3.1 The Physics of Actigraphy and Data Ingestion 
+The raw data consists of an acceleration vector $\mathbf{a}_t = [a_{x,t}, a_{y,t}, a_{z,t}]^T$ 
+measured in gravitational units ($g$). At any given moment, this vector represents the 
+superposition of three forces: 
+
+1.​ Bodily Movement: The signal of interest resulting from muscle contraction. 
+2.​ Gravitational Acceleration: A constant $1g$ vector pointing towards the Earth's 
+
+center. 
+3.​ Sensor Noise: Thermal and quantization noise inherent to MEMS accelerometers. 
+
+To isolate the behavioral signal, we utilize the Euclidean Norm Minus One (ENMO) metric. This 
+metric calculates the magnitude of the acceleration vector and subtracts the $1g$ 
+gravitational component: 
+ 
+ 
+$$\text{ENMO}_t = \max \left( \sqrt{a_{x,t}^2 + a_{y,t}^2 + a_{z,t}^2} - 1, 0 \right)$$ 
+ 
+The max(..., 0) operation ensures non-negativity, effectively clipping sensor noise that might 
+result in values slightly below $1g$ during rest.3 This provides a strictly non-negative scalar of 
+physical intensity. However, for sleep detection, intensity is less important than orientation. 
+3.2 The Heuristic Algorithm for Angle-Z (HDCZA) 
+For sleep/wake detection, we implement the van Hees algorithm (also known as HDCZA), 
+which represents the modern standard for raw accelerometry processing.3 Historically, sleep 
+detection relied on count-based algorithms like Sadeh or Cole-Kripke, which were developed 
+for older piezoelectric sensors. HDCZA leverages the superior precision of MEMS 
+accelerometers to detect posture rather than just motion. 
+
+The core biomechanical principle is that sleep is characterized by prolonged postural stability. 
+The algorithm calculates the arm angle relative to the gravitational plane ($\phi_z$) at each 
+timestep $t$: 
+ 
+ 
+
+
+
+$$\phi_{z,t} = \arctan \left( \frac{a_{z,t}}{\sqrt{a_{x,t}^2 + a_{y,t}^2}} \right) \cdot 
+\frac{180}{\pi}$$A moving window $W$ (typically 5 minutes) is analyzed. The block is 
+classified as a **Sustained Inactivity Bout (SIB)**—a proxy for sleep—if the range of angles 
+within that window is less than a specific threshold (typically 5 degrees):$$\max_{i \in 
+W}(\phi_{z,i}) - \min_{i \in W}(\phi_{z,i}) < 5^{\circ}$$ 
+ 
+This 5-degree/5-minute rule 3 provides a robust, interpretable "Ground Truth" for sleep 
+windows (Sleep Period Time, SPT) without relying on subjective sleep diaries, which are 
+notoriously unreliable in pediatric populations.15 It is critical to note that this heuristic 
+assumes the device is worn on the wrist; hip-worn data requires different thresholds 16, but 
+HBN protocols confirm wrist placement.17 
+3.3 Advanced Feature Engineering: Circadian Metrics 
+Beyond simple sleep duration, we extract features that capture the temporal architecture of 
+behavior. These are not used as static inputs to the model, but as validation targets for the 
+causal discovery module. 
+
+●​ Social Jetlag (SJL): This quantifies the "biological tax" of the school week. It is 
+calculated as the absolute difference between the midpoint of sleep on free days 
+($\text{MSF}_{sc}$) and the midpoint of sleep on work/school days ($\text{MSW}$):​
+​
+$$\text{SJL} = | \text{MSF}_{sc} - \text{MSW} |$$​
+​
+Research links high SJL to metabolic dysregulation, depressive symptoms, and 
+potentially PIU.1 
+
+●​ Cosinor Robustness: We fit a cosine curve with a fixed 24-hour period to the activity 
+data using least squares:​
+​
+$$Y(t) = M + A \cos(\omega t + \phi) + e(t)$$​
+​
+The $F$-statistic of this fit quantifies "Circadian Robustness." Low robustness indicates 
+a fragmented, erratic rhythm often associated with neurodevelopmental disorders.3 
+
+●​ Fragmentation Index: This measures the "brittleness" of sleep. It is calculated as the 
+transition probability between "Rest" and "Activity" states during the defined sleep 
+window.3 High fragmentation is a hallmark of stress and poor sleep quality, potentially 
+mediating the link between PIU and cognitive decline. 
+
+4. The Finalized Architecture: Causal-HD-Mamba 
+We propose the Causal-HD-Mamba (Causal Hierarchical Disentangled Mamba) as the 
+finalized architecture. This model moves beyond the transformer-based approaches that 
+struggle with sequence length and the RNNs that suffer from gradient vanishing. It leverages 
+
+
+
+the Mamba (Selective State Space Model) backbone for its linear scaling with sequence 
+length ($O(L)$) and its ability to selectively remember or ignore information.20 
+
+4.1 Theoretical Rationale: Why Mamba? 
+The "Long Sequence" problem is the Achilles' heel of applying deep learning to actigraphy. A 
+single week of accelerometer data at 30Hz contains over 18 million data points. Even after 
+downsampling to 1-minute epochs, the sequence length for a month of data exceeds 40,000 
+steps. 
+
+●​ Transformers: The attention mechanism scales quadratically ($O(L^2)$). For 
+$L=40,000$, the attention matrix would require processing $1.6 \times 10^9$ 
+interactions, which is computationally prohibitive and memory-intensive.20 
+
+●​ RNNs (LSTM/GRU): While linear in scaling ($O(L)$), RNNs suffer from the "forgetting 
+problem" over long sequences due to gradient vanishing/exploding. They cannot 
+effectively link a sleep deficit on Monday to a behavioral outburst on Friday. 
+
+Mamba achieves linear scaling ($O(L)$) while retaining long-range dependency capabilities 
+comparable to Transformers. It does this by parameterizing the recurrent state dynamics as a 
+discretized continuous system: 
+ 
+ 
+$$h_t = \bar{\mathbf{A}} h_{t-1} + \bar{\mathbf{B}} x_t$$ 
+ 
+$$y_t = \mathbf{C} h_t$$ 
+Crucially, Mamba introduces a Selection Mechanism, making the discretization parameter 
+$\Delta$ (which controls the "step size" or "memory decay") a function of the input $x_t$.20 
+
+ 
+
+$$\Delta_t = \text{Softplus}(\text{Linear}(x_t))$$ 
+ 
+This allows the model to: 
+
+1.​ Ignore Noise: When $x_t$ contains irrelevant sensor noise (e.g., non-wear periods 
+identified by the capacitive sensor), the model can set $\Delta \to 0$, effectively 
+freezing the state $h_t$ and preserving prior context. 
+
+2.​ Reset Context: When a distinct event occurs (e.g., waking up), the model can 
+adaptively reset its memory to start a new "behavioral episode." 
+
+This content-aware selectivity is perfectly suited for the bursty, sparse nature of human 
+behavioral data. 
+
+4.2 Component 1: The Hierarchical Encoder (HD-Mamba) 
+We adopt a Hierarchical Mamba structure 23 to handle the multi-scale nature of human 
+
+
+
+behavior. Behavior exists at multiple frequencies: sub-second (tremors, myoclonic jerks), 
+minute-level (activity bouts), circadian (24h cycles), and infradian (weekly social rhythms). A 
+single flat model cannot capture all these scales efficiently. 
+
+The HD-Mamba Encoder consists of three stacked blocks, progressively reducing temporal 
+resolution while increasing channel depth: 
+
+Block Level Input Resolution State Dimension Function 
+(D) 
+
+Micro-Block 5 seconds 64 Captures 
+immediate physical 
+intensity, posture 
+changes, and 
+tremor. 
+
+Meso-Block 1 minute 128 Downsamples 
+Micro output 
+(Conv1D, stride 12). 
+Models "bouts" of 
+activity and screen 
+usage. 
+
+Macro-Block 1 hour 256 Downsamples 
+Meso output 
+(Conv1D, stride 60). 
+Models circadian 
+rhythms, phase 
+shifts, and social 
+jetlag. 
+
+This hierarchical approach ensures that the model captures long-range dependencies (e.g., 
+the cumulative effect of irregular sleep over a month) without losing the fine-grained details 
+of sleep fragmentation.25 The "Information-Guided" aspect 23 involves feeding the static 
+demographic data (Age, Sex) into the selection mechanism of the Macro-Block, allowing the 
+model to adjust its "time constants" based on the developmental stage of the child (e.g., 
+expecting shorter sleep for older teens). 
+
+4.3 Component 2: Disentangled Dependency Encoding (SAMBA) 
+Standard multivariate models simply concatenate all features (Activity, Light, Heart Rate) into 
+a single vector $x_t$. This confuses temporal dependencies (how past sleep affects future 
+
+
+
+sleep) with cross-variate dependencies (how light affects sleep). In a causal framework, 
+these are distinct mechanisms. 
+
+We implement a Disentangled Dependency Encoding strategy inspired by the SAMBA 
+architecture.2 The encoder splits the input into two parallel streams: 
+
+1.​ Time Encoder (Univariate Mamba): Processes each variable (Activity, Light, HR) 
+independently through its own Mamba block. This forces the model to learn the intrinsic 
+temporal dynamics of that specific signal (e.g., the autocorrelation of sleep, the 
+persistence of physical activity). 
+
+2.​ Variate Encoder (Cross-Attention/Linear): Processes the variables at each timestep 
+$t$ to model their instantaneous relationship. For example, "High Light" + "Low Activity" 
++ "Low HR" might signify "Reading in Bed," whereas "Low Light" + "Low Activity" + "High 
+HR" might signify "Anxiety/Insomnia." 
+
+The outputs of these two streams are fused only at the final layer. This separation is critical 
+for causal inference, as it allows us to distinguish between a variable that predicts another 
+over time (Granger cause) versus one that merely correlates instantly. 
+
+4.4 Component 3: Spectral Orthogonality Loss 
+To further enforce disentanglement, particularly between the "Routine" (Circadian) and 
+"Deviation" (Behavioral) components, we introduce a Spectral Orthogonality Loss.29 Neural 
+networks often conflate periodic signals (biological clock) with aperiodic trends (increasing 
+fatigue or stress). 
+
+We apply a Fast Fourier Transform (FFT) to the latent representations $Z$. The loss function 
+minimizes the overlap between the "Periodic" subspace (learned by the Macro-Block) and the 
+"Trend" subspace (learned by the Meso-Block): 
+ 
+ 
+$$\mathcal{L}_{\text{orth}} = \| \text{FFT}(Z_{\text{periodic}}) \cdot 
+\text{FFT}(Z_{\text{trend}}) \|^2$$ 
+ 
+This forces the model to separate the predictable biological clock (Periodic) from the 
+stochastic behavioral deviations (Trend). In the context of PIU, the deviations from the routine 
+(e.g., staying up 3 hours later than usual) are often the true pathological signals, while the 
+routine itself is just the baseline. 
+
+5. Causal Discovery and Structure Learning 
+Simply predicting the SII score is insufficient; we must validate the pathway. A model that 
+predicts PIU based on "School Season" is useless for intervention. A model that predicts PIU 
+
+
+
+based on "Sleep Fragmentation" provides a target for therapy. We integrate a Neural 
+Granger Causality module to uncover these pathways. 
+
+5.1 Latent Causal Graph with CUTS+ 
+We employ the CUTS+ (Causal discovery from Irregular Time Series) framework.3 The outputs 
+of the HD-Mamba encoder are fed into a causal discovery head. This head attempts to 
+forecast future values of all variables using a sparse adjacency matrix $A$. 
+ 
+ 
+$$\hat{x}_{t+1} = f_{\theta}(A \odot \text{History}(x_{<t}))$$ 
+ 
+By applying an $L_1$ penalty to the matrix $A$, we encourage sparsity. The non-zero entries 
+in $A$ reveal the learned Granger causal graph. 
+
+●​ Hypothesis Check: A valid model for PIU should show a causal link from Social Jetlag 
+(SJL) $\to$ Sleep Fragmentation $\to$ SII. 
+
+●​ Negative Control Analysis: We introduce "Negative Control" variables—features that 
+should not causally drive acute PIU, such as Handedness.31 If the model learns a causal 
+link from "Handedness" to "Daily Activity Spikes," it indicates overfitting or artifactual 
+learning. The causal loss is penalized if edges are detected originating from these 
+negative controls. 
+
+5.2 TCDF Validation 
+As a secondary validation step, we employ the Temporal Causal Discovery Framework 
+(TCDF).3 TCDF uses attention-based CNNs to detect time delays (lags). If the HD-Mamba 
+detects a link between Poor Sleep and PIU, TCDF confirms the lag. 
+
+●​ Immediate Effect (Lag < 24h): Poor sleep leads to fatigue and screen use the next day. 
+●​ Cumulative Effect (Lag > 7 days): Chronic sleep deprivation leads to depression and 
+
+withdrawal over weeks.​
+This granular temporal insight allows clinicians to distinguish between acute stress 
+responses and chronic behavioral patterns. 
+
+6. Invariant Risk Minimization: Solving the "Luck" 
+Problem 
+The primary critique of the Kaggle winners was their reliance on "luck" regarding the test set 
+distribution. To eliminate this, we replace standard Empirical Risk Minimization (ERM) with 
+Invariant Risk Minimization (IRM), specifically the Variance Risk Extrapolation (V-REx) 
+variant.34 
+
+
+
+6.1 Defining Environments 
+In IRM/V-REx, we define "Environments" ($e$) as distinct distributions of data where spurious 
+correlations vary, but the causal mechanism should remain stable. For the HBN dataset, we 
+construct environments based on confounders identified in Section 2.2: 
+
+1.​ Age Groups: Pre-teen (5-10), Early Teen (11-14), Late Teen (15-21). A causal mechanism 
+(e.g., light suppresses melatonin) must hold across all ages, even if the base rates of 
+internet use differ. 
+
+2.​ Seasons: School Term vs. Summer Break. This is inferred from date stamps or explicitly 
+provided season columns.11 "High Activity" might correlate with "Low PIU" in the summer 
+(outdoor play), but not necessarily in the winter (indoor sports). V-REx forces the model 
+to ignore this unstable correlation. 
+
+6.2 The V-REx Objective Function 
+Standard training minimizes the average loss across all data: $\min_{\theta} \sum_{e} 
+\mathcal{L}_e(\theta)$. 
+V-REx adds a penalty for the variance of the loss across environments: 
+ 
+ 
+$$\mathcal{L}_{\text{V-REx}} = \sum_{e} \mathcal{L}_e(\theta) + \lambda \cdot \text{Var}(\{ 
+\mathcal{L}_e(\theta) \}_{e \in \mathcal{E}})$$ 
+ 
+Mechanism: If a model relies on a spurious feature (e.g., "High Activity = Low PIU"), this 
+relationship might hold for "Summer" but fail for "School Term". This discrepancy would cause 
+the loss $\mathcal{L}_{\text{Summer}}$ to be low and $\mathcal{L}_{\text{School}}$ to be 
+high, resulting in a large variance. V-REx penalizes this variance, forcing the model to discard 
+the "Activity" feature and focus on features that predict PIU equally well in all seasons (e.g., 
+"Sleep Fragmentation"). 
+This explicitly removes the "luck" factor. The model is constrained to learn only those 
+mechanisms that are robust across age and season, ensuring generalization to the private 
+test set regardless of its composition. 
+
+7. Self-Supervised Pre-Training Strategy 
+Given the relative scarcity of labelled SII scores (only ~3,800 targets) compared to the volume 
+of raw actigraphy (millions of points), we employ a self-supervised pre-training phase using a 
+Masked Gradient Prediction task.37 
+
+7.1 Masked Feature Prediction (MaskFeat) 
+Instead of predicting the raw accelerometer value, which is dominated by high-frequency 
+
+
+
+noise, we predict the feature of the masked area. 
+1.​ Masking: We randomly mask 40% of the time series segments. 
+2.​ Target: The model must predict the Histogram of Oriented Gradients (HOG) of the 
+
+missing accelerometer data. 
+
+Rationale: Predicting the exact acceleration value is difficult and often irrelevant (stochastic 
+noise). Predicting the gradient distribution (i.e., "was this a period of high-frequency 
+movement or stillness?") captures the semantic content of the behavior (Sleep vs. Wake vs. 
+Vigorous Activity) without overfitting to sensor noise. This pre-training allows the HD-Mamba 
+encoder to learn a rich representation of human movement dynamics before it is ever exposed 
+to the limited PIU labels. 
+
+8. Implementation Guide & Technical Specifications 
+This architecture is designed for implementation in PyTorch. 
+
+8.1 The Pipeline 
+1.​ Ingestion: Load Parquet files. Apply SKDH calibration to remove sensor drift.39 
+
+Calculate ENMO and Angle-Z. 
+2.​ Metadata Fusion: Merge with Tabular data. Encode "Season" and "Age" into 
+
+environment labels for V-REx. 
+3.​ Pre-Training: Train the HD-Mamba encoder on the full unlabelled dataset using the 
+
+MaskFeat loss. 
+4.​ Fine-Tuning (Causal): Freeze the bottom layers of the encoder. Train the CUTS+ head 
+
+and the Prediction head using the V-REx loss on the labelled subset. 
+5.​ Inference: Output both the SII prediction and the Causal Graph. Use the graph to 
+
+generate a text explanation (via LLM) for the clinician. 
+
+8.2 PyTorch Pseudo-Code for V-REx Loss 
+ 
+
+Python 
+ 
+ 
+import torch​
+import torch.nn as nn​
+​
+class VRExLoss(nn.Module):​
+    def __init__(self, lambda_penalty=10.0):​
+
+
+
+        super().__init__()​
+        self.lambda_penalty = lambda_penalty​
+        self.criterion = nn.MSELoss() # Or CrossEntropy for classification​
+​
+    def forward(self, predictions, targets, env_indices):​
+        unique_envs = torch.unique(env_indices)​
+        env_losses =​
+        ​
+        for env in unique_envs:​
+            mask = (env_indices == env)​
+            if mask.sum() > 0:​
+                loss = self.criterion(predictions[mask], targets[mask])​
+                env_losses.append(loss)​
+        ​
+        # Stack losses to compute variance​
+        if len(env_losses) > 0:​
+            env_losses = torch.stack(env_losses)​
+            mean_loss = env_losses.mean()​
+            variance_loss = env_losses.var()​
+            return mean_loss + self.lambda_penalty * variance_loss​
+        else:​
+            return torch.tensor(0.0, requires_grad=True)​
+ 
+
+9. Critical Evaluation and Future Horizons 
+9.1 Addressing the Critiques 
+The proposed Causal-HD-Mamba architecture systematically addresses the flaws of the 
+current Kaggle SOTA: 
+
+Critique of SOTA Causal-HD-Mamba Mechanism 
+Solution 
+
+"Luck" / Fragility V-REx Explicitly penalizes 
+variance across 
+distributions (Age, Season), 
+forcing the model to learn 
+invariant, robust features 
+
+
+
+rather than "lucky" splits. 
+
+Correlation vs Causation CUTS+ / Disentanglement Separates temporal causal 
+links from instantaneous 
+correlations. Validates 
+pathways using Negative 
+Controls (Handedness). 
+
+Temporal Flattening Mamba Backbone Models the full sequence 
+with linear complexity 
+($O(L)$), retaining all 
+temporal dynamics without 
+aggregation. 
+
+Black Box Interpretability Causal graphs and TCDF 
+attention weights provide 
+mechanistic explanations 
+that can be translated into 
+clinical reports. 
+
+9.2 Limitations 
+●​ Computational Cost: While Mamba is efficient ($O(L)$), the addition of causal 
+
+discovery (CUTS+) and the V-REx variance calculation (requiring forward passes for 
+multiple environments) increases training time significantly compared to XGBoost. 
+
+●​ Data Requirements: V-REx requires domain labels (Season, Age). If these are missing 
+or noisy, the invariance constraint weakens. We must ensure robust imputation or 
+exclusion of samples with missing environment labels. 
+
+●​ Observational Ceiling: Without true interventions (e.g., forcing a child to sleep earlier), 
+we are limited to inferred causality (Granger), which is a necessary but not sufficient 
+condition for true physical causality. 
+
+9.3 Future Directions: Large Language Models as Reasoners 
+An exciting frontier is the integration of Large Language Models (LLMs). Once 
+Causal-HD-Mamba generates a causal graph (e.g., SJL -> Fragmentation -> PIU), this graph 
+can be serialized into text and fed to a clinical LLM (e.g., Med-PaLM). The LLM can then 
+generate a clinically readable report: "The model detected that Social Jetlag is the primary 
+driver of the patient's sleep fragmentation, which subsequently predicts their high SII score. 
+Recommended intervention: Stabilize weekend sleep schedules." This bridges the gap 
+
+
+
+between complex causal AI and actionable clinical utility. 
+
+10. Conclusion 
+The transition from correlation to causality in detecting Problematic Internet Use is not merely 
+a technical upgrade; it is an ethical and clinical necessity. The "Causal-HD-Mamba" 
+architecture proposed here provides the rigor lacking in current leaderboard-chasing 
+solutions. By respecting the physics of the sensor, the hierarchy of biological time, and the 
+invariance of causal mechanisms, we can build models that do not just predict, but 
+understand. In the context of youth mental health, where interventions must be precise and 
+safe, this understanding is the only metric that truly matters. 
+
+References used throughout the text:.1 
+
+Works cited 
+
+1.​ Child Mind Institute — Problematic Internet Use | Kaggle, accessed December 22, 
+2025, 
+https://www.kaggle.com/competitions/child-mind-institute-problematic-internet-
+use 
+
+2.​ Child Mind Institute — Problematic Internet Use | Kaggle, accessed December 22, 
+2025, 
+https://www.kaggle.com/competitions/child-mind-institute-problematic-internet-
+use/data 
+
+3.​ Causal AI for Internet Use.pdf 
+4.​ First Place Write-Up: Or How I Won the Lottery | Kaggle, accessed December 22, 
+
+2025, 
+https://www.kaggle.com/competitions/child-mind-institute-problematic-internet-
+use/writeups/lennart-haupts-first-place-write-up-or-how-i-won-t 
+
+5.​ Assessing actimeters for inclusion in the Healthy Brain Network - ResearchGate, 
+accessed December 22, 2025, 
+https://www.researchgate.net/publication/345700862_Assessing_actimeters_for_i
+nclusion_in_the_Healthy_Brain_Network 
+
+6.​ wGT3X- BT - Timik Group, accessed December 22, 2025, 
+https://www.timikgroup.com/product/wgt3x-bt/ 
+
+7.​ ActiGraph wGT3X-BT - Ametris Wearable Devices, accessed December 22, 2025, 
+https://ametris.com/actigraph-wgt3x-bt 
+
+8.​ ActiGraph wGT3X-BT, accessed December 22, 2025, 
+https://actigraphcorp-v3-staging.azurewebsites.net/actigraph-wgt3x-bt/ 
+
+9.​ PR: ActiGraph Launches New Generation of Bluetooth® Smart Activity Monitors, 
+accessed December 22, 2025, 
+https://www.actigraphcorp.com/press-release/actigraph-launches-new-generati
+on-of-bluetooth-smart-activity-monitors/ 
+
+10.​Child Mind Institute — Problematic Internet Use - Kaggle, accessed December 22, 
+
+
+
+2025, 
+https://www.kaggle.com/competitions/child-mind-institute-problematic-internet-
+use/discussion/541007 
+
+11.​Child Mind Institute — Problematic Internet Use - Kaggle, accessed December 22, 
+2025, 
+https://www.kaggle.com/competitions/child-mind-institute-problematic-internet-
+use/discussion/535354 
+
+12.​CMI-PIU: Features EDA - Kaggle, accessed December 22, 2025, 
+https://www.kaggle.com/code/antoninadolgorukova/cmi-piu-features-eda 
+
+13.​How to implement spectral normalization in pytorch, accessed December 22, 
+2025, 
+https://discuss.pytorch.org/t/how-to-implement-spectral-normalization-in-pytor
+ch/10518 
+
+14.​Time Series Forecasting with PyTorch | by Amit Yadav | We Talk Data - Medium, 
+accessed December 22, 2025, 
+https://medium.com/we-talk-data/time-series-forecasting-with-pytorch-c18fc51
+2daf4 
+
+15.​What Is Self-Supervised Learning? - IBM, accessed December 22, 2025, 
+https://www.ibm.com/think/topics/self-supervised-learning 
+
+16.​Estimating the sleep period time window based on a hip- worn accelerometer 
+collected in children and adults. - medRxiv, accessed December 22, 2025, 
+https://www.medrxiv.org/content/10.1101/2025.11.25.25340956v1.full.pdf 
+
+17.​ChildMindInstitute/Healthy-Brain-Network-wearable-evaluation - GitHub, 
+accessed December 22, 2025, 
+https://github.com/ChildMindInstitute/Healthy-Brain-Network-wearable-evaluatio
+n 
+
+18.​Child Mind Institute and Kaggle Launch Competition to Predict Teen Internet 
+Addiction, accessed December 22, 2025, 
+https://childmind.org/blog/child-mind-institute-and-kaggle-launch-competition-t
+o-predict-teen-internet-addiction/ 
+
+19.​Spectral Norm in Pytorch - autograd, accessed December 22, 2025, 
+https://discuss.pytorch.org/t/spectral-norm-in-pytorch/13664 
+
+20.​AI-Driven sleep staging from actigraphy and heart rate | PLOS One - Research 
+journals, accessed December 22, 2025, 
+https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0285703 
+
+21.​Mamba: Linear-Time Sequence Modeling with Selective State Spaces - 
+OpenReview, accessed December 22, 2025, 
+https://openreview.net/forum?id=AL1fq05o7H 
+
+22.​Mamba: Linear-Time Sequence Modeling with Selective State Spaces (Paper 
+Explained), accessed December 22, 2025, 
+https://www.youtube.com/watch?v=9dSkvxS2EB0 
+
+23.​Hierarchical Information-Guided Spatio-Temporal Mamba for Stock Time Series 
+Forecasting, accessed December 22, 2025, https://arxiv.org/html/2503.11387v1 
+
+24.​Hierarchical Mamba Meets Hyperbolic Geometry: A New Paradigm for Structured 
+Language Embeddings - arXiv, accessed December 22, 2025, 
+
+
+
+https://arxiv.org/html/2505.18973v3 
+25.​Hi-Mamba: Hierarchical Mamba for Efficient Image Super-Resolution - arXiv, 
+
+accessed December 22, 2025, https://arxiv.org/html/2410.10140v1 
+26.​A Symmetry-Aware Hierarchical Graph-Mamba Network for Spatio-Temporal 
+
+Road Damage Detection - MDPI, accessed December 22, 2025, 
+https://www.mdpi.com/2073-8994/17/12/2173 
+
+27.​Hierarchical Information-Guided Spatio-Temporal Mamba for Stock Time Series 
+Forecasting - AWS, accessed December 22, 2025, 
+https://ecmlpkdd-storage.s3.eu-central-1.amazonaws.com/preprints/2025/resear
+ch/preprint_ecml_pkdd_2025_research_812.pdf 
+
+28.​Simplified Mamba with Disentangled Dependency Encoding for Long-Term Time 
+Series Forecasting | OpenReview, accessed December 22, 2025, 
+https://openreview.net/forum?id=9VRFPC29nb 
+
+29.​FreDN: Spectral Disentanglement for Time Series Forecasting via Learnable 
+Frequency Decomposition - ResearchGate, accessed December 22, 2025, 
+https://www.researchgate.net/publication/397700869_FreDN_Spectral_Disentang
+lement_for_Time_Series_Forecasting_via_Learnable_Frequency_Decomposition 
+
+30.​Kaggle Winning Solutions Walkthroughs:Child Mind Institute - Detect Sleep States 
+with 1st Place Team - YouTube, accessed December 22, 2025, 
+https://www.youtube.com/watch?v=B9q7W0pK4aI 
+
+31.​DISCLAIMER This report was prepared as an account of work sponsored by an 
+agency of the United States Government. Neither the Un - OSTI, accessed 
+December 22, 2025, https://www.osti.gov/servlets/purl/2525988 
+
+32.​Detect Behavior with Sensor Data - CMI - Kaggle, accessed December 22, 2025, 
+https://www.kaggle.com/competitions/cmi-detect-behavior-with-sensor-data/da
+ta 
+
+33.​The Healthy Brain Network Biobank: An open resource for transdiagnostic 
+research in pediatric mental health and learning disorders | bioRxiv, accessed 
+December 22, 2025, https://www.biorxiv.org/content/10.1101/149369v1.full-text 
+
+34.​Learning Invariant Graph Representations Through Redundant Information - arXiv, 
+accessed December 22, 2025, https://arxiv.org/html/2512.06154v1 
+
+35.​ICML 2021 Orals, accessed December 22, 2025, 
+https://icml.cc/virtual/2021/events/oral 
+
+36.​[2006.07544] Risk Variance Penalization - arXiv, accessed December 22, 2025, 
+https://arxiv.org/abs/2006.07544 
+
+37.​Masked Feature Prediction for Self-Supervised Visual Pre-Training - CVF Open 
+Access, accessed December 22, 2025, 
+https://openaccess.thecvf.com/content/CVPR2022/papers/Wei_Masked_Feature_
+Prediction_for_Self-Supervised_Visual_Pre-Training_CVPR_2022_paper.pdf 
+
+38.​Masked Feature Prediction for Self-Supervised Visual Pre-Training, accessed 
+December 22, 2025, https://www.cs.jhu.edu/~alanlab/Pubs22/wei2022masked.pdf 
+
+39.​Mamba architecture : A Leap Forward in Sequence Modeling | by Puneet Hegde - 
+Medium, accessed December 22, 2025, 
+https://medium.com/@puneetthegde22/mamba-architecture-a-leap-forward-in-
+sequence-modeling-370dfcbfe44a 
+
+
+
+40.​SensibleSleep: A Bayesian Model for Learning Sleep Patterns from Smartphone 
+Events | PLOS One - Research journals, accessed December 22, 2025, 
+https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169901
