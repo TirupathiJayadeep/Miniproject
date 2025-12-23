@@ -1,59 +1,97 @@
-## Title of the Project
-Small description about the project like one below
-The integration of a chatbot within a hostel booking system, aimed at streamlining the reservation process for students and improving the overall user experience.
+# ComplianceNet: Compliance-Driven Prediction of Problematic Internet Use (PIU)
 
-## About
-<!--Detailed Description about the project-->
-Tailored Chatbot for Hostel Booking System is a project designed to integrate a chatbot that leverages advanced natural language processing techniques to understand and respond to user queries to the hostel booking system. Traditional hostel booking processes are often time-consuming and involve manual searches and extensive communication with hostel staff. This project seeks to overcome these challenges by creating an easy-to-use chatbot interface that assists students in addressing inquiries.
+ComplianceNet is a specialized machine learning framework designed to predict Problematic Internet Use (PIU) in children and adolescents using actigraphy data (wearable sensor data). Instead of focusing solely on physical activity, ComplianceNet leverages *compliance behavior*—how participants interact with the wearable device itself—as a primary predictor.
 
-## Features
-<!--List the features of the project as shown below-->
-- Implements advance neural network method.
-- A framework based application for deployment purpose.
-- High scalability.
-- Less time complexity.
-- A specific scope of Chatbot response model, using json data format.
+## 🚀 Key Features
 
-## Requirements
-<!--List the requirements of the project as shown below-->
-* Operating System: Requires a 64-bit OS (Windows 10 or Ubuntu) for compatibility with deep learning frameworks.
-* Development Environment: Python 3.6 or later is necessary for coding the sign language detection system.
-* Deep Learning Frameworks: TensorFlow for model training, MediaPipe for hand gesture recognition.
-* Image Processing Libraries: OpenCV is essential for efficient image processing and real-time hand gesture recognition.
-* Version Control: Implementation of Git for collaborative development and effective code management.
-* IDE: Use of VSCode as the Integrated Development Environment for coding, debugging, and version control integration.
-* Additional Dependencies: Includes scikit-learn, TensorFlow (versions 2.4.1), TensorFlow GPU, OpenCV, and Mediapipe for deep learning tasks.
+- **Compliance Vector Extraction Engine (CVEE):** Extracts 20 high-dimensional features related to device usage, including:
+  - Battery neglect patterns
+  - Nocturnal disconnect index
+  - Micro-removal frequency
+  - Sensory rejection signatures
+  - Weekend dropout differentials
+- **DTW-Enhanced Temporal Clustering Module (DTCM):** Discovers compliance phenotypes (e.g., "Escapist", "Disorganized", "Sensory Avoider") using Dynamic Time Warping.
+- **Transformer-based Missingness Encoder (TME):** A deep learning architecture that encodes multi-day non-wear sequences and predicts the Severity Impairment Index (SII).
+- **End-to-End Pipeline:** Integrates data preprocessing, feature extraction, phenotype classification, and severity prediction.
 
-## System Architecture
-<!--Embed the system architecture diagram as shown below-->
+## 📁 Repository Structure
 
-![Screenshot 2023-11-25 133637](https://github.com/<<yourusername>>/Hand-Gesture-Recognition-System/assets/75235455/a60c11f3-0a11-47fb-ac89-755d5f45c995)
+```text
+├── src/
+│   ├── cvee.py         # Compliance Vector Extraction Engine
+│   ├── dtcm.py         # DTW-Enhanced Temporal Clustering
+│   ├── tme.py          # Transformer-based Missingness Encoder
+│   ├── pipeline.py     # End-to-end prediction pipeline
+│   └── utils.py        # Utility functions (QWK, CV helpers, etc.)
+├── tests/
+│   ├── test_compliance_net.py       # Core module tests (75 tests)
+│   ├── test_data_validation.py      # Schema & quality tests (15 tests)
+│   ├── test_model_performance.py    # Predictive performance tests (21 tests)
+│   └── test_phenotype_classification.py # Phenotype logic tests (22 tests)
+├── demo.py             # Full pipeline demonstration
+└── pytest.ini          # Test configuration
+```
 
+## 🛠️ Installation
 
-## Output
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/compliancenet.git
+    cd compliancenet
+    ```
 
-<!--Embed the Output picture at respective places as shown below as shown below-->
-#### Output1 - Name of the output
+2.  **Install dependencies:**
+    ```bash
+    pip install numpy pandas scikit-learn scipy
+    ```
 
-![Screenshot 2023-11-25 134037](https://github.com/<<yourusername>>/Hand-Gesture-Recognition-System/assets/75235455/8c2b6b5c-5ed2-4ec4-b18e-5b6625402c16)
+## 💻 Usage
 
-#### Output2 - Name of the output
-![Screenshot 2023-11-25 134253](https://github.com/<<yourusername>>/Hand-Gesture-Recognition-System/assets/75235455/5e05c981-05ca-4aaa-aea2-d918dcf25cb7)
+### Running the Demo
+The `demo.py` script generates synthetic actigraphy data and runs the entire pipeline, including phenotype classification and severity prediction.
 
-Detection Accuracy: 96.7%
-Note: These metrics can be customized based on your actual performance evaluations.
+```bash
+python demo.py
+```
 
+### Basic Pipeline Integration
+```python
+from src.pipeline import full_pipeline_predict, classify_phenotype
+import pandas as pd
 
-## Results and Impact
-<!--Give the results and impact as shown below-->
-The Sign Language Detection System enhances accessibility for individuals with hearing and speech impairments, providing a valuable tool for inclusive communication. The project's integration of computer vision and deep learning showcases its potential for intuitive and interactive human-computer interaction.
+# Load your actigraphy data
+data = pd.read_csv("your_data.csv")
 
-This project serves as a foundation for future developments in assistive technologies and contributes to creating a more inclusive and accessible digital environment.
+# Classify compliance phenotype
+phenotype = classify_phenotype(data)
+print(f"Primary Phenotype: {phenotype['primary']}")
 
-## Articles published / References
-1. N. S. Gupta, S. K. Rout, S. Barik, R. R. Kalangi, and B. Swampa, “Enhancing Heart Disease Prediction Accuracy Through Hybrid Machine Learning Methods ”, EAI Endorsed Trans IoT, vol. 10, Mar. 2024.
-2. A. A. BIN ZAINUDDIN, “Enhancing IoT Security: A Synergy of Machine Learning, Artificial Intelligence, and Blockchain”, Data Science Insights, vol. 2, no. 1, Feb. 2024.
+# Predict Severity Impairment Index (SII)
+sii = full_pipeline_predict(data)
+print(f"Predicted SII: {sii}")
+```
 
+## 🧪 Testing
 
+ComplianceNet includes a robust suite of **133 tests** covering all aspects of the framework.
 
+Run all tests:
+```bash
+python -m pytest tests/ -v
+```
 
+Tests include:
+- **Unit Tests:** Validating individual CVEE mathematical computations.
+- **Integration Tests:** Verifying the full pipeline flow.
+- **Validation Tests:** Ensuring incoming data meets schema requirements.
+- **Performance Tests:** Checking model consistency and metric (QWK) correctness.
+
+## 📖 Methodology
+
+ComplianceNet is built on the hypothesis that non-wear patterns in actigraphy are not "missing data" but are instead valuable behavioral signals. It identifies three distinct clinical phenotypes:
+1.  **Escapist:** High nocturnal removals, often associated with late-night screen use.
+2.  **Disorganized:** Irregular removals and battery neglect, associated with ADHD-type traits.
+3.  **Sensory Avoider:** Frequent short-duration removals triggered by agitation or sensory overload.
+
+## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details.
